@@ -1,10 +1,10 @@
-#Levin protocol
+# Levin protocol
 
 TurtleCoin daemon seems to talk using Levin Protocol. This is just a look at the protocol..
 
 The protocol has a header and body part.
 
-##header
+## header
 
 The header is defined in LevinProtocol.cpp as:
 
@@ -37,11 +37,11 @@ LEVIN_PACKET_REQUEST in LevinProtocol.cpp.
 
 *m_protocol_version* the protocol version, likely for some updates and compatibility checks.
 
-##body
+## body
 
 The body part is simply binary data written over the network as is.
 
-##serialization
+## serialization
 
 The writeStrict() and readStrict() functions in LevinProtocol.cpp seem to push the data into a binary format
 using some default c++ operations. What does this mean, and how shoudl serialization be written?
@@ -67,7 +67,7 @@ detail it actually shows me these are the network protocol headers all the way u
 
 So from "01 21" forward it is the actual payload data. What is it?
 
-###signature
+### signature
 
 The protocol header should start with the signature value of 0x0101010101012101LL.
 LL in the end defines it as "long long" value, which i guess just makes it suitable for uint64 in c++.
@@ -81,7 +81,7 @@ The big-endian encoding is "01 01 01 01 01 01 21 01", which matches the actual s
 The little-endian encoding gives "01 21 01 01 01 01 01 01", which matches the tcpdump packet data.
 So the header should be encoded as little-endian, and this is actual Levin protocol formatted data.
 
-###body size
+### body size
 
 Following *m_signature* is *m_cb*, which is the protocol body size.
 This is again uint64 (somebody expects pretty big data in a single msg..), and the next 8 bytes of the dump are
@@ -95,12 +95,12 @@ Which matches exactly 789 + 33 = 822.
 
 So the serialization writes the header first, immediately followed by the body data.
 
-###have to return data?
+### have to return data?
 
 Next in the header is *m_have_to_return_data*.
 In this dump it is 00, which translates to false. So this should be a notification?
 
-###command
+### command
 
 The command value is next, which here is "d2 07 00 00" -> 0x07d2 -> 2002.
 To figure what this is, it is necessary to find what commands are defined in the code.
@@ -110,22 +110,22 @@ as ping, and uses a base value of 1000.
 2002 is then NOTIFY_NEW_TRANSACTIONS, or so I think. 
 This also matches the boolean value of *m_have_to_return_data* above, meaning it is intended to be a notification.
 
-###return code
+### return code
 
 Return code in this case is "00 00 00 00", 
 which is likely just null value since a notification has no reply/return value expected.
 
-###flags
+### flags
 
 Flags in this dump are "01 00 00 00", which translates to 0x00000001. 
 This matches the LevinProtocol.cpp definition of LEVIN_PACKET_REQUEST = 0x00000001.
 So it is a notification but the flag types are request and reply, and this is just a request with no reply expected.
 
-###protocol version
+### protocol version
 
 Protocol version is a similar set of 4 bytes "01 00 00 00". So version 1 (little-endian).
 
-##body
+### body
 
 The body data in this case seems to start from "01 11 01 01 01 01 02 01 01", whatever this is.
 Likely some transaction data, since this was a message with command NOTIFY_NEW_TRANSACTIONS.
