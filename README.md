@@ -1,2 +1,2 @@
 # turtlegod
-The TurtleGoD sips on Canti's port
+Playing with TurtleCoin daemon code in Golang.
