@@ -33,6 +33,7 @@ for ts, buf in pcap:
 		#large data streams get chunked, so this assumes the same msg spans multiple IP packets and skips parsing ones without header id
 		print("skipping non-levin header packet")
 		continue
+	#need to get command id, which is at index 34-42 in hex string (17-21 in byte array but string has 2 chars for byte)
 	#header is encoded in little-endian, so have to reverse the bytes for command first
 	byte1_hex = data_str[40:42]
 	byte2_hex = data_str[38:40]
@@ -40,7 +41,7 @@ for ts, buf in pcap:
 	byte4_hex = data_str[34:36]
 	cmd_hex = byte1_hex+byte2_hex+byte3_hex+byte4_hex
 #	print("hex", cmd_hex)
-	cmd_id = int(cmd_hex, 16) #this should not be the levin protocol command id for msg, as integer
+	cmd_id = int(cmd_hex, 16) #this should now be the levin protocol command id for msg, as integer
 	dump_dir = "levin_pcap_dumps/"+str(cmd_id)
 	print("cmd:", cmd_id)
 	if not os.path.exists(dump_dir):
