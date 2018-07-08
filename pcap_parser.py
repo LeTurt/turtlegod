@@ -16,6 +16,7 @@ print('Argument List:', str(sys.argv))
 f = open(sys.argv[1], "rb")
 pcap = dpkt.pcap.Reader(f)
 index = 1
+all_hex = ""
 for ts, buf in pcap:
 #	print(ts, len(buf))
 	hex = buf.hex()
@@ -52,6 +53,8 @@ for ts, buf in pcap:
 	hex_file.write(data_str)
 	hex_file.close()
 
+	all_hex += str(cmd_id)+": "+data_str+"\n"
+
 	#dump packet pcap for wireshark analysis
 	pcap_file = open(dump_dir+"/"+str(index)+".pcap", "wb")
 #	f = open(pcap_file, "rb")
@@ -62,4 +65,11 @@ for ts, buf in pcap:
 
 	index += 1
 #	print(tcp.data.hex())
+
+dump_dir = "levin_pcap_dumps/all/"
+if not os.path.exists(dump_dir):
+	os.makedirs(dump_dir)
+hex_file = open(dump_dir + "all_cmds_hex.txt", "w")
+hex_file.write(all_hex)
+hex_file.close()
 
