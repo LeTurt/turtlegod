@@ -173,7 +173,7 @@ which does this
             sec.insert(name, loadEntry(stream));
         }
 
-So it reads a JSON object, which has *count* number of values in it. These are loaded with readName() and loadEntry(). This does
+It reads a JSON object, which has *count* number of values in it. These are loaded with readName() and loadEntry(). This does
 
     void readName(Common::IInputStream &s, std::string &name)
     {
@@ -185,7 +185,7 @@ So it reads a JSON object, which has *count* number of values in it. These are l
         }
     }
 
-Where readPod reads data from the stream of the given size. So in this case it reads one byte to get the name length. This is followed by reading the number of bytes matching the name length. So the format is <single byte for size><name in number of bytes from first byte>.
+Where readPod reads data from the stream of the given size. So in this case it reads one byte to get the name length. This is followed by reading the number of bytes matching the name length. So the format is |single byte for size||name in number of bytes from first byte|.
 
 To load entry for the name:
 
@@ -219,7 +219,7 @@ Arrays:
         return arr;
     }
 
-So just read number of values in array first as the varint type. The loadValue() as with plain values.
+So just read number of values in array first as the varint type. Then loadValue() as with plain values.
 
     JsonValue loadValue(Common::IInputStream &stream, uint8_t type)
     {
@@ -257,7 +257,7 @@ So just read number of values in array first as the varint type. The loadValue()
         }
     }
 
-So this defines what all data types there are, and how they can be loaded. There are only a few options here. readIntegerJson() for different size of numbers (8 bit, 16 bit, ...), with sign or not. readPodJson() is where most of it seems to end up at with different types given
+So this defines what all data types there are, and how they can be loaded. There are actually only a few options where the method calls end up here. readIntegerJson() for different size of numbers (8 bit, 16 bit, ...), with sign or not. readPodJson() is where most of it seems to end up at with different types given
 
     template<typename T, typename JsonT = T>
     JsonValue readPodJson(Common::IInputStream &s)
