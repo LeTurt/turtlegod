@@ -88,8 +88,8 @@ func readValue(data []byte) (interface{}, int) {
 		start := 1+bytesRead
 		end := start + sizeI
 		hash := data[start:end]
-		value := string(hash)
-		return value, end
+//		value := hex.EncodeToString(hash)
+		return hash, end
 	}
 	return nil, 0
 }
@@ -127,9 +127,11 @@ func parse1002(data []byte) CmdTimedSync {
 		panic("Expected 1 root object, got " + strconv.Itoa(len(kvs)))
 	}
 
-	currentHeight := kvs["current_height"].(uint32)
-	topId := kvs["top_id"].([]byte)
+	payloadMap := kvs["payload_data"].(map[string]interface{})
+	currentHeight := payloadMap["current_height"].(uint32)
+	topId := payloadMap["top_id"].([]byte)
 	hashStr := hex.EncodeToString(topId)
 
-	return CmdTimedSync{currentHeight, topId, hashStr}
+	cmd1002 := CmdTimedSync{currentHeight, topId, hashStr}
+	return cmd1002
 }
