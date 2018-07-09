@@ -5,6 +5,7 @@ import (
 	"net"
 	"io"
 	"encoding/hex"
+	"github.com/leturt/turtlegod/p2p/commands"
 )
 
 //first 8 bytes of protocol header, identifying the protocol messages
@@ -26,13 +27,6 @@ type LevinHeader struct {
 	ReturnCode       int32
 	Flags            uint32
 	Version          uint32
-}
-
-type LevinCommand struct {
-	Command        uint32
-	IsNotification bool
-	IsResponse     bool
-	data           []byte
 }
 
 func headerSize() int {
@@ -95,8 +89,12 @@ func SendMessage(command uint32, data []byte, needResponse bool) {
 }
 
 func ReceiveMessage() {
+	parseLevinHeader(conn)
+}
+
+func parseLevinHeader(reader io.Reader) commands.LevinCommand {
 	headerBytes := make([]byte, headerSize())
-	readStrict(headerBytes)
+	readStrict(headerBytes, reader)
 
 	header := LevinHeader{}
 	header.Signature = binary.LittleEndian.Uint64(headerBytes[:8])
@@ -110,13 +108,14 @@ func ReceiveMessage() {
 
 	//TODO: check max body size
 	data := make([]byte, header.BodySize)
-	readStrict(data)
+	readStrict(data, reader)
 
-	cmd := LevinCommand{}
+	cmd := commands.LevinCommand{}
 	cmd.Command = header.Command
-	cmd.data = data
+	cmd.Data = data
 	cmd.IsNotification = !header.HaveToReturnData
 	cmd.IsResponse = (header.Flags & LEVIN_PACKET_RESPONSE) == LEVIN_PACKET_RESPONSE
+	return cmd
 }
 
 func writeStrict(data []byte) {
@@ -127,12 +126,11 @@ func writeStrict(data []byte) {
 	}
 }
 
-func readStrict(data []byte) bool {
+func readStrict(data []byte, reader io.Reader) bool {
 	//connection is built in p2pnode.cpp
 	//https://stackoverflow.com/questions/24339660/read-whole-data-with-golang-net-conn-read#24343240
-	//	b := make([]byte, headerSize())
-	n, err := io.ReadFull(conn, data)
-	print("read", n, "bytes")
+	n, err := io.ReadFull(reader, data)
+	println("read", n, "bytes")
 	//ReadFull also gives ErrUnexpectedEOF error in case of too few bytes to read, so err != nil should cover all cases
 	if err != nil {
 		//TODO:
