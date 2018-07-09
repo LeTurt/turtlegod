@@ -3,7 +3,9 @@ __author__ = 'LeTurt'
 #pip3 install dpkt to run first
 #then run with pcap file path as parameter
 #result should be directory "levin_pcap_dumps", under which a sub-directory for each command id found in the dump.
-#under which two files for each packet with that command, one as text-formatted hex-string, one as pcap file for opening with wireshark
+#under which three files for each packet with that command, one as text-formatted hex-string, one as pcap file for opening with wireshark,
+#one as raw binary of the tcp payload, which would be the actual protocol packet and nothing more
+#there is also the "all" directory, under which a summary txt file is placed containing hex strings for all packets, one on line. easier comparisons.
 
 import dpkt
 import sys
@@ -57,11 +59,14 @@ for ts, buf in pcap:
 
 	#dump packet pcap for wireshark analysis
 	pcap_file = open(dump_dir+"/"+str(index)+".pcap", "wb")
-#	f = open(pcap_file, "rb")
 	pcap_writer = dpkt.pcap.Writer(pcap_file)
 	pcap_writer.writepkt(buf, ts)
-#	pcap_file.write(buf)
 	pcap_file.close()
+
+	#dump packet binary for parser testing
+	bin_file = open(dump_dir+"/"+str(index)+".bin", "wb")
+	bin_file.write(tcp.data)
+	bin_file.close()
 
 	index += 1
 #	print(tcp.data.hex())
