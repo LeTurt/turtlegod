@@ -39,26 +39,26 @@ func unpackVarInt(data []byte) (uint64, int) {
 		value := data[0] >> 2
 		return uint64(value), 1
 	case 1:
-		value := data[0]
-		value |= data[1] << 8;
+		value := uint64(data[0])
+		value |= uint64(data[1]) << 8;
 		value = value >> 2
 		return uint64(value), 2
 	case 2:
-		value := data[0]
-		value |= data[1] << 8;
-		value |= data[2] << 16;
-		value |= data[3] << 24;
+		value := uint64(data[0])
+		value |= uint64(data[1]) << 8;
+		value |= uint64(data[2]) << 16;
+		value |= uint64(data[3]) << 24;
 		value = value >> 2
 		return uint64(value), 4
 	default:
-		value := data[0]
-		value |= data[1] << 8;
-		value |= data[2] << 16;
-		value |= data[3] << 24;
-		value |= data[4] << 32;
-		value |= data[5] << 40;
-		value |= data[6] << 48;
-		value |= data[7] << 56;
+		value := uint64(data[0])
+		value |= uint64(data[1]) << 8;
+		value |= uint64(data[2]) << 16;
+		value |= uint64(data[3]) << 24;
+		value |= uint64(data[4]) << 32;
+		value |= uint64(data[5]) << 40;
+		value |= uint64(data[6]) << 48;
+		value |= uint64(data[7]) << 56;
 		value = value >> 2
 		return uint64(value), 8
 	}
@@ -75,12 +75,18 @@ func readName(data []byte) (string, int) {
 func readValue(data []byte) (interface{}, int) {
 	typeId := data[0]
 	switch typeId {
+	case BIN_KV_SERIALIZE_TYPE_UINT8:
+		value := uint8(data[1])
+		return value, 2
 	case BIN_KV_SERIALIZE_TYPE_OBJECT:
 		kvs, bytesRead := readSection(data[1:])
 		return kvs, bytesRead + 1
 	case BIN_KV_SERIALIZE_TYPE_UINT32:
 		value := binary.LittleEndian.Uint32(data[1:5])
 		return value, 5
+	case BIN_KV_SERIALIZE_TYPE_UINT64:
+		value := binary.LittleEndian.Uint64(data[1:9])
+		return value, 9
 	case BIN_KV_SERIALIZE_TYPE_STRING:
 		size, bytesRead := unpackVarInt(data[1:])
 		//again assume string fits in positive integer
@@ -134,4 +140,32 @@ func parse1002(data []byte) CmdTimedSync {
 
 	cmd1002 := CmdTimedSync{currentHeight, topId, hashStr}
 	return cmd1002
+}
+
+func parsePeerList(data []uint8) []string {
+	count := len(data)/24
+	peerlist := []string{} //todo: set capacity to count
+	for i := 0 ; i < count ; i++ {
+		ip1 := strconv.FormatUint(uint64(data[0]), 10)
+		ip2 := strconv.FormatUint(uint64(data[1]), 10)
+		ip3 := strconv.FormatUint(uint64(data[2]), 10)
+		ip4 := strconv.FormatUint(uint64(data[3]), 10)
+		ip := ip1 + "." + ip2 + "." + ip3 + "." + ip4
+		port := binary.LittleEndian.Uint32(data[4:8])
+		peerIdType := binary.LittleEndian.Uint64(data[8:16])
+		lastSeen := binary.LittleEndian.Uint64(data[16:24])
+		peerInfo := ip + ":" + strconv.FormatUint(uint64(port), 10) + " type: " + strconv.FormatUint(peerIdType, 10) +
+			"seen: "+strconv.FormatUint(lastSeen, 10)
+		peerlist = append(peerlist, peerInfo)
+		data = data[24:]
+	}
+	return peerlist
+}
+
+func parse1001(data []byte) {
+	kvs, _ := readSection(data)
+	peerList := kvs["local_peerlist"].([]uint8)
+	peers := parsePeerList(peerList)
+	print(peers)
+
 }

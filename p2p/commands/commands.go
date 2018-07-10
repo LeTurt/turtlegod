@@ -29,5 +29,12 @@ func ParseCmd(cmd LevinCommand) {
 		panic("Invalid storage version")
 	}
 
-	parse1002(cmd.Data[9:])
+	switch cmd.Command {
+	case 1001:
+		parse1001(cmd.Data[9:])
+	case 1002:
+		parse1002(cmd.Data[9:])
+	case 2002:
+		parse2002(cmd.Data[9:])
+	}
 }
