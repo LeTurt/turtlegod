@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"encoding/hex"
 	"encoding/binary"
+	"math"
 )
 
 const BIN_KV_SERIALIZE_TYPE_INT64 uint8 = 1;
@@ -72,32 +73,86 @@ func readName(data []byte) (string, int) {
 	return name, int(size) + 1
 }
 
-func readValue(data []byte) (interface{}, int) {
-	typeId := data[0]
+func readValue(data []byte, typeId uint8) (interface{}, int) {
+	if typeId & BIN_KV_SERIALIZE_FLAG_ARRAY != 0 {
+		typeId = typeId &^ BIN_KV_SERIALIZE_FLAG_ARRAY
+		items, readBytes := readArray(data, typeId)
+		return items, readBytes
+	}
 	switch typeId {
+	case BIN_KV_SERIALIZE_TYPE_BOOL:
+		value := int8(data[0])
+		return value > 0, 1
+	case BIN_KV_SERIALIZE_TYPE_INT8:
+		value := int8(data[0])
+		return value, 1
+	case BIN_KV_SERIALIZE_TYPE_INT16:
+		value := binary.LittleEndian.Uint16(data[0:2])
+		//TODO: add tests to see signed ints are ok for all sizes
+		return int16(value), 2
+	case BIN_KV_SERIALIZE_TYPE_INT32:
+		value := binary.LittleEndian.Uint32(data[0:4])
+		return int32(value), 4
+	case BIN_KV_SERIALIZE_TYPE_INT64:
+		value := binary.LittleEndian.Uint64(data[0:8])
+		return int64(value), 8
 	case BIN_KV_SERIALIZE_TYPE_UINT8:
 		value := uint8(data[1])
+		return value, 1
+	case BIN_KV_SERIALIZE_TYPE_UINT16:
+		value := binary.LittleEndian.Uint16(data[0:2])
 		return value, 2
-	case BIN_KV_SERIALIZE_TYPE_OBJECT:
-		kvs, bytesRead := readSection(data[1:])
-		return kvs, bytesRead + 1
 	case BIN_KV_SERIALIZE_TYPE_UINT32:
-		value := binary.LittleEndian.Uint32(data[1:5])
-		return value, 5
+		value := binary.LittleEndian.Uint32(data[0:4])
+		return value, 4
 	case BIN_KV_SERIALIZE_TYPE_UINT64:
-		value := binary.LittleEndian.Uint64(data[1:9])
-		return value, 9
+		value := binary.LittleEndian.Uint64(data[0:8])
+		return value, 8
+	case BIN_KV_SERIALIZE_TYPE_DOUBLE:
+		//double in cryptonote is 8 bytes, checked with compiling and running sizeof(double)
+		//parsing: https://stackoverflow.com/questions/22491876/convert-byte-array-uint8-to-float64-in-golang#22492518
+		bits := binary.LittleEndian.Uint64(data[0:8])
+		value := math.Float64frombits(bits)
+		return value, 8
+	case BIN_KV_SERIALIZE_TYPE_OBJECT:
+		kvs, bytesRead := readSection(data)
+		return kvs, bytesRead
 	case BIN_KV_SERIALIZE_TYPE_STRING:
-		size, bytesRead := unpackVarInt(data[1:])
-		//again assume string fits in positive integer
-		sizeI := int(size)
-		start := 1+bytesRead
-		end := start + sizeI
-		hash := data[start:end]
+		hash, bytesRead := readString(data)
 //		value := hex.EncodeToString(hash)
-		return hash, end
+		return hash, bytesRead
+	case BIN_KV_SERIALIZE_TYPE_ARRAY:
+		items, readBytes := readArray(data, typeId)
+		return items, readBytes
 	}
+	//TODO: panic
 	return nil, 0
+}
+
+func readString(data []byte) ([]byte, int) {
+	size, bytesRead := unpackVarInt(data)
+	//again assume string fits in positive integer
+	sizeI := int(size)
+	start := bytesRead
+	end := start + sizeI
+	hash := data[start:end]
+	return hash, end
+}
+
+func readArray(data []byte, typeId uint8) (interface{}, int) {
+	totalBytes := 0
+	size, readBytes := unpackVarInt(data);
+	totalBytes += readBytes
+	items := make([]interface{}, size)
+	data = data[readBytes:]
+	//assume array size is less than max positive integer
+	for i := 0 ; i < int(size) ; i++ {
+		value, readBytes := readValue(data, typeId)
+		items = append(items, value)
+		totalBytes += readBytes
+		data = data[readBytes:]
+	}
+	return items, totalBytes
 }
 
 //a section has N objects, and the N is always the first value as varInt, followed by section name as "Name" type.
@@ -116,7 +171,9 @@ func readSection(data []byte) (map[string]interface{}, int) {
 		data = data[bytesRead:]
 		totalBytes += bytesRead
 
-		i, bytesRead := readValue(data)
+		typeId := data[0]
+		data = data[1:]
+		i, bytesRead := readValue(data, typeId)
 		data = data[bytesRead:]
 		totalBytes += bytesRead
 
