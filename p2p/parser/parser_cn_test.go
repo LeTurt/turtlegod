@@ -187,7 +187,7 @@ func TestCNUInt64(t *testing.T) {
 	data = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x02} //little-endian byte order, so low byte first. or so i think from CN code..
 	val, bytesRead = UnpackCNVarIntUint64(data)
 	assert.Equal(t, uint64(0x7fffffffffffffff), val, "0xfffffffffffffffff should be parsed as integer.")
-//	assert.Panics(t, func() {UnpackCNVarIntUint64(data)})
+//	assert.Panics(t, func() {UnpackCNVarIntUint64(datamodel)})
 
 	data = []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}
 	assert.Panics(t, func() {UnpackCNVarIntUint64(data)})

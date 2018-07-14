@@ -122,7 +122,7 @@ func writeStrict(data []byte) {
 	n, err := conn.Write(data)
 	println("wrote:", n, "bytes")
 	if err != nil {
-		println("error writing data", err)
+		println("error writing datamodel", err)
 	}
 }
 
