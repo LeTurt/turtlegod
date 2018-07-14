@@ -1,8 +1,6 @@
-package commands
+package parser
 
 import (
-	"strconv"
-	"encoding/hex"
 	"encoding/binary"
 	"math"
 )
@@ -22,18 +20,7 @@ const BIN_KV_SERIALIZE_TYPE_OBJECT uint8 = 12;
 const BIN_KV_SERIALIZE_TYPE_ARRAY uint8 = 13;
 const BIN_KV_SERIALIZE_FLAG_ARRAY uint8 = 0x80;
 
-type KeyValue struct {
-	key   string
-	value interface{}
-}
-
-type CmdTimedSync struct {
-	currentHeight uint32
-	hash          []uint8
-	hashStr       string
-}
-
-func unpackVarInt(data []byte) (uint64, int) {
+func UnpackP2PVarInt(data []byte) (uint64, int) {
 	size := data[0] & 0x03
 	switch size {
 	case 0:
@@ -67,16 +54,16 @@ func unpackVarInt(data []byte) (uint64, int) {
 }
 
 //name is a special case, where it always has a single byte for size (number of chars to follow)
-func readName(data []byte) (string, int) {
+func ReadName(data []byte) (string, int) {
 	size := uint8(data[0])
 	name := string(data[1 : size+1])
 	return name, int(size) + 1
 }
 
-func readValue(data []byte, typeId uint8) (interface{}, int) {
+func ReadValue(data []byte, typeId uint8) (interface{}, int) {
 	if typeId & BIN_KV_SERIALIZE_FLAG_ARRAY != 0 {
 		typeId = typeId &^ BIN_KV_SERIALIZE_FLAG_ARRAY
-		items, readBytes := readArray(data, typeId)
+		items, readBytes := ReadArray(data, typeId)
 		return items, readBytes
 	}
 	switch typeId {
@@ -115,22 +102,22 @@ func readValue(data []byte, typeId uint8) (interface{}, int) {
 		value := math.Float64frombits(bits)
 		return value, 8
 	case BIN_KV_SERIALIZE_TYPE_OBJECT:
-		kvs, bytesRead := readSection(data)
+		kvs, bytesRead := ReadSection(data)
 		return kvs, bytesRead
 	case BIN_KV_SERIALIZE_TYPE_STRING:
-		hash, bytesRead := readString(data)
-//		value := hex.EncodeToString(hash)
+		hash, bytesRead := ReadString(data)
+		//		value := hex.EncodeToString(hash)
 		return hash, bytesRead
 	case BIN_KV_SERIALIZE_TYPE_ARRAY:
-		items, readBytes := readArray(data, typeId)
+		items, readBytes := ReadArray(data, typeId)
 		return items, readBytes
 	}
 	//TODO: panic
 	return nil, 0
 }
 
-func readString(data []byte) ([]byte, int) {
-	size, bytesRead := unpackVarInt(data)
+func ReadString(data []byte) ([]byte, int) {
+	size, bytesRead := UnpackP2PVarInt(data)
 	//again assume string fits in positive integer
 	sizeI := int(size)
 	start := bytesRead
@@ -139,15 +126,15 @@ func readString(data []byte) ([]byte, int) {
 	return hash, end
 }
 
-func readArray(data []byte, typeId uint8) (interface{}, int) {
+func ReadArray(data []byte, typeId uint8) (interface{}, int) {
 	totalBytes := 0
-	size, readBytes := unpackVarInt(data);
+	size, readBytes := UnpackP2PVarInt(data);
 	totalBytes += readBytes
 	items := make([]interface{}, size)
 	data = data[readBytes:]
 	//assume array size is less than max positive integer
 	for i := 0 ; i < int(size) ; i++ {
-		value, readBytes := readValue(data, typeId)
+		value, readBytes := ReadValue(data, typeId)
 		items = append(items, value)
 		totalBytes += readBytes
 		data = data[readBytes:]
@@ -158,22 +145,22 @@ func readArray(data []byte, typeId uint8) (interface{}, int) {
 //a section has N objects, and the N is always the first value as varInt, followed by section name as "Name" type.
 //followed by the N objects, each with a type byte, followed by their specific bytes identified by the type byte
 //the protocol seems to always have a single root object, so this expects the root to be a section of size 1
-func readSection(data []byte) (map[string]interface{}, int) {
+func ReadSection(data []byte) (map[string]interface{}, int) {
 	totalBytes := 0
-	count, bytesRead := unpackVarInt(data)
+	count, bytesRead := UnpackP2PVarInt(data)
 	totalBytes += bytesRead
 	//move slice forward by number of consumed bytes
 	data = data[bytesRead:]
 	items := make(map[string]interface{})
 	//assuming there will be no more values in a section than range of positive integer
 	for i := 0; i < int(count); i++ {
-		name, bytesRead := readName(data)
+		name, bytesRead := ReadName(data)
 		data = data[bytesRead:]
 		totalBytes += bytesRead
 
 		typeId := data[0]
 		data = data[1:]
-		i, bytesRead := readValue(data, typeId)
+		i, bytesRead := ReadValue(data, typeId)
 		data = data[bytesRead:]
 		totalBytes += bytesRead
 
@@ -182,47 +169,3 @@ func readSection(data []byte) (map[string]interface{}, int) {
 	return items, totalBytes
 }
 
-func parse1002(data []byte) CmdTimedSync {
-	//the protocol is parsed in KVBinaryInputStreamSerializer.parseBinary() in TC code
-	//it seems to always start with a single "section". So read the section size and name first
-	kvs, _ := readSection(data)
-	if len(kvs) != 1 {
-		panic("Expected 1 root object, got " + strconv.Itoa(len(kvs)))
-	}
-
-	payloadMap := kvs["payload_data"].(map[string]interface{})
-	currentHeight := payloadMap["current_height"].(uint32)
-	topId := payloadMap["top_id"].([]byte)
-	hashStr := hex.EncodeToString(topId)
-
-	cmd1002 := CmdTimedSync{currentHeight, topId, hashStr}
-	return cmd1002
-}
-
-func parsePeerList(data []uint8) []string {
-	count := len(data)/24
-	peerlist := []string{} //todo: set capacity to count
-	for i := 0 ; i < count ; i++ {
-		ip1 := strconv.FormatUint(uint64(data[0]), 10)
-		ip2 := strconv.FormatUint(uint64(data[1]), 10)
-		ip3 := strconv.FormatUint(uint64(data[2]), 10)
-		ip4 := strconv.FormatUint(uint64(data[3]), 10)
-		ip := ip1 + "." + ip2 + "." + ip3 + "." + ip4
-		port := binary.LittleEndian.Uint32(data[4:8])
-		peerIdType := binary.LittleEndian.Uint64(data[8:16])
-		lastSeen := binary.LittleEndian.Uint64(data[16:24])
-		peerInfo := ip + ":" + strconv.FormatUint(uint64(port), 10) + " type: " + strconv.FormatUint(peerIdType, 10) +
-			"seen: "+strconv.FormatUint(lastSeen, 10)
-		peerlist = append(peerlist, peerInfo)
-		data = data[24:]
-	}
-	return peerlist
-}
-
-func parse1001(data []byte) {
-	kvs, _ := readSection(data)
-	peerList := kvs["local_peerlist"].([]uint8)
-	peers := parsePeerList(peerList)
-	print(peers)
-
-}
