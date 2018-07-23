@@ -4,7 +4,7 @@ import (
 	"testing"
 	"encoding/hex"
 	"os"
-	"github.com/leturt/turtlegod/p2p/commands"
+	"github.com/leturt/turtlegod/legacy/p2p/commands"
 )
 
 func TestHeaderSerialize(t *testing.T) {
@@ -48,8 +48,30 @@ func TestCmd1002(t *testing.T) {
 	commands.ParseCmd(cmd)
 }
 
+func TestCmd1003(t *testing.T) {
+	dataFile, err := os.Open("commands/1003.bin")
+	if err != nil {
+		panic(err)
+	}
+	defer dataFile.Close()
+	cmd := parseLevinHeader(dataFile)
+	print(cmd.Command)
+	commands.ParseCmd(cmd)
+}
+
 func TestCmd2002(t *testing.T) {
 	dataFile, err := os.Open("commands/2002.bin")
+	if err != nil {
+		panic(err)
+	}
+	defer dataFile.Close()
+	cmd := parseLevinHeader(dataFile)
+	print(cmd.Command)
+	commands.ParseCmd(cmd)
+}
+
+func TestCmd2003(t *testing.T) {
+	dataFile, err := os.Open("commands/2003.bin")
 	if err != nil {
 		panic(err)
 	}

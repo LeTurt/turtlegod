@@ -31,10 +31,15 @@ func ParseCmd(cmd LevinCommand) {
 
 	switch cmd.Command {
 	case 1001:
-		parse1001(cmd.Data[9:])
+//		parse1001(cmd.Data[9:])
+		parse1001Reply(cmd.Data[9:])
 	case 1002:
 		parse1002(cmd.Data[9:])
+	case 1003:
+		parse1003(cmd.Data[9:])
 	case 2002:
 		parse2002(cmd.Data[9:])
+	case 2003:
+		parse2003(cmd.Data[9:])
 	}
 }

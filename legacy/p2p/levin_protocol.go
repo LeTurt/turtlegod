@@ -5,7 +5,7 @@ import (
 	"net"
 	"io"
 	"encoding/hex"
-	"github.com/leturt/turtlegod/p2p/commands"
+	"github.com/leturt/turtlegod/legacy/p2p/commands"
 )
 
 //first 8 bytes of protocol header, identifying the protocol messages

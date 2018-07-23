@@ -3,6 +3,7 @@ package parser
 import (
 	"encoding/binary"
 	"math"
+	"encoding/hex"
 )
 
 const BIN_KV_SERIALIZE_TYPE_INT64 uint8 = 1;
@@ -60,6 +61,7 @@ func ReadName(data []byte) (string, int) {
 	return name, int(size) + 1
 }
 
+
 func ReadValue(data []byte, typeId uint8) (interface{}, int) {
 	if typeId & BIN_KV_SERIALIZE_FLAG_ARRAY != 0 {
 		typeId = typeId &^ BIN_KV_SERIALIZE_FLAG_ARRAY
@@ -106,7 +108,8 @@ func ReadValue(data []byte, typeId uint8) (interface{}, int) {
 		return kvs, bytesRead
 	case BIN_KV_SERIALIZE_TYPE_STRING:
 		hash, bytesRead := ReadString(data)
-		//		value := hex.EncodeToString(hash)
+		value := hex.EncodeToString(hash)
+		println(value)
 		return hash, bytesRead
 	case BIN_KV_SERIALIZE_TYPE_ARRAY:
 		items, readBytes := ReadArray(data, typeId)
@@ -135,7 +138,8 @@ func ReadArray(data []byte, typeId uint8) (interface{}, int) {
 	//assume array size is less than max positive integer
 	for i := 0 ; i < int(size) ; i++ {
 		value, readBytes := ReadValue(data, typeId)
-		items = append(items, value)
+		items[i] = value
+		//items = append(items, value) //set fixed size in make() so no need to append
 		totalBytes += readBytes
 		data = data[readBytes:]
 	}
@@ -160,6 +164,7 @@ func ReadSection(data []byte) (map[string]interface{}, int) {
 
 		typeId := data[0]
 		data = data[1:]
+		totalBytes++
 		i, bytesRead := ReadValue(data, typeId)
 		data = data[bytesRead:]
 		totalBytes += bytesRead

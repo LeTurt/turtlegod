@@ -1,15 +1,29 @@
 package commands
 
 import (
-	"github.com/leturt/turtlegod/p2p/parser"
-	"github.com/leturt/turtlegod/p2p/datamodel"
+	"github.com/leturt/turtlegod/legacy/p2p/parser"
+	"github.com/leturt/turtlegod/legacy/p2p/datamodel"
+	"encoding/hex"
 )
 
 func parse2002(data []byte) {
 	kvs, _ := parser.ReadSection(data)
 	txs := kvs["txs"].([]interface{})
-	data = txs[1].([]uint8)
+	data = txs[0].([]uint8)
 	ParseTransaction(data)
+}
+
+func parse2003(data []byte) {
+	kvs, _ := parser.ReadSection(data)
+	blockData := kvs["blocks"].([]byte)
+	blockCount := len(blockData)/32
+	println()
+	for i := 0 ; i < blockCount ; i++ {
+		hashBytes := data[0:32]
+		data = data[32:]
+		hashStr := hex.EncodeToString(hashBytes)
+		println(hashStr)
+	}
 }
 
 func ParseTransaction(data []byte) {
@@ -31,7 +45,7 @@ func ParseTransaction(data []byte) {
 	for i := 0 ; i < int(inputCount) ; i++ {
 		typeTag := uint8(data[0])
 		if typeTag != 0x02 {
-			panic("Expecting only KeyInput type tags in transaction input.")
+			panic("Expecting only txin_to_key type tags in transaction input.")
 		}
 		data = data[1:]
 

@@ -71,7 +71,7 @@ So from "01 21" forward it is the actual payload data. What is it?
 
 ### signature
 
-The protocol header should start with the signature value of 0x0101010101012101LL.
+Looking at CN code, the protocol header should start with the signature value of 0x0101010101012101LL.
 LL in the end defines it as "long long" value, which i guess just makes it suitable for uint64 in c++.
 uint 64 is 8 bytes in memory, and first 8 bytes of the payload are
 "01 21 01 01 01 01 01 01", which seems a bit like the signature but not quite. 
