@@ -3,7 +3,7 @@ The Levin body part is different, these are notes on investigating how the body 
 
 The body part consists of a command and its parameters. 
 The command is actually identified by the "command" field in the [Levin protocol](levin_protocol.md) header.
-The Levin body part then contains the fields and values for the command.
+The Levin body part then contains the fields and their values for the command.
 Similar to the Levin protocol main header, the body itself has its own header.
 This is defined as a set of fields in CN code:
 
@@ -16,7 +16,7 @@ This is 01011101 for PORTABLE_STORAGE_SIGNATUREA, 01020101 for PORTABLE_STORAGE_
 and 01 for PORTABLE_STORAGE_FORMAT_VER.
 Little-endian encoded it becomes 011101010101020101.
 
-So combining this with the [Levin protocol](levin_protocol.md) header, 
+Combining this with the [Levin protocol](levin_protocol.md) header, 
 the full header with levin protocol header + body-header is something like
 0121010101010101150300000000000000d2070000000000000100000001000000 011101010101020101,
 where the command id in the levin header in this case is d207 or 2002. The latter space-separated part is the body-header.
@@ -42,7 +42,7 @@ These are serialized to bits in the following ways:
 
 # varint
 
-So the data types mentioned something called varint. This comes up in different ways in many places of the protocol.
+What is varint in the datatypes? This comes up in different ways in many places of the protocol.
 It stands for var-int, or I guess varying length integer. There are two different encodings the CN code uses for this.
 First is the *P2P* varint, as I like to call it. The second is the *CN* varint, again, just my choise of name.
 Just think of them as names, that's all.
@@ -50,7 +50,7 @@ Just think of them as names, that's all.
 ## p2p-varint
 
 This type of encoding packs the size of the integer in the two lowest bits of the first byte.
-So the first byte is something like 0x......00. Where the last two bits define the integer size.
+So the first byte is something like 0b......00. Where the last two bits define the integer size.
 This is the two bits that here were set to 0 both, so the "00" ending. As it is 2 bits, it can represent 4 values:
 
 * 0 (00): 6 bit integer - 1 byte
@@ -100,14 +100,17 @@ This is complicated to explain, so my golang code from [p2p_parser](legacy/p2p/p
 ## cn-varint
 
 This encoding uses the highest bit of each byte to signal whether to add another byte to the value.
-The maximum size seems to be 8 bytes. 
 The biggest value allowed is that expressed by *uint64*, so the value parsing is capped at that range.
 
 Example.
-Biggest value that can be represented with one byte is 7 bits = 63 in decimal.
-This would be 0x01111111 in binary. After the highest bit is set, the second byte is read.
-So to get the value of 64, we need two bytes.
-Byte 1: 0x00000001, byte 2: 0x10000000. There you go.
+Biggest value that can be represented with one byte is 7 bits = 127 in decimal.
+This would be 0b01111111 in binary. After the highest bit is set, the second byte is read.
+So to get the value of 128, we need two bytes.
+Byte 1: 0b10000000, byte 2: 0b00000001. This becomes 0b10000000 or 128.
+Because it takes the last 7 bits from byte 1 as 0b00000000. The highest bit signals to take the second byte.
+The second byte is interpreted as 0b0000000010000000.
+When OR'd together, these become 0b0000000010000000 = 128, since the first byte was just zeroes, and high bit set.
+There you go.
 
 Here is again my golang code from [cn_parser](legacy/p2p/parser/parser_cn.go) for this:
 
@@ -144,14 +147,14 @@ Here is again my golang code from [cn_parser](legacy/p2p/parser/parser_cn.go) fo
         return value, bytesRead
     }
 
-Now try parsing that code.. :)
+Now try parsing that code in your head.. :)
 
 # composite datatypes
 
 So the varint explanation was just a diversion from the actual data types listed far above.
 Most of the datatypes listed are rather simple and do not actually use the varints for anything.
 However, when varints are used with these datatypes, they are of the *p2p* varint type.
-The *cn* varint is used with the data structured contained withing these data-types in some of
+The *cn* varint is used with the data structured contained within these data-types in some of
 the 2000+X commands only.
 There are two datatypes that are composites and make more use of the *p2p* varints.
 Sections and arrays. OK, maybe strings too.
@@ -159,11 +162,11 @@ Sections and arrays. OK, maybe strings too.
 ## sections
 
 Every body of every command has one high-level Section that contains all the rest of the data.
-This of it like a JSON-type structure, which has a root element.
+Think of it like a JSON-type structure, which has a root element.
 Well, you could maybe imagine some XML too, but let's not get too messed up, eh.
 
 The Section starts with a varint value describing the number of elements under the root elements.
-Think of this as the value N.
+Call it the value N.
 Then you loop through N values of any of the data types, including possibly other nested Sections.
 For these N values, the following is performed.
 
@@ -207,7 +210,7 @@ I don't recall seeing the BIN_KV_SERIALIZE_TYPE_ARRAY actually used, and reading
 But if it does, they both point to the same underlying implementation for parsing once you know its an array
 you are looking at.
 So BIN_KV_SERIALIZE_FLAG_ARRAY is used.
-The way it is used is the value 0x80 maps to binary of 0x10000000.
+The way it is used is the value 0x80 maps to binary of 0b10000000.
 So the highest bit is used to signal if the value is an array of some type.
 The remaining 7 lowest bits then define the type itself, which can be any of the above values from 1-12
 (well 13 too in theory).
@@ -286,7 +289,7 @@ The implementation is hiding somewhere in the CN code, this is just an analysis 
 The second field of the inner Section is "version". 
 It starts with 07 for name length of "version", followed by the characters.
 This has type 0x08 = BIN_KV_SERIALIZE_TYPE_UINT8. So it is uint8 for version.
-The version value is a single by of 0x01.
+The version value is a single byte of 0x01.
 After this starts again next field value for field "peer_id" for the inner Section.
 This is type 05, so uint64. 
 Following 8 bytes are for the peer_id value, which, again, I don't know how it is formed.
@@ -323,8 +326,9 @@ And the port number of 11897 can be found in the TurtleCoin source code. So it a
 ### 1001: Handshake reply
 
 When a node sends a handshake to another node, it gets back a reply with the other nodes info.
-I believe this is the response expected flag in the Levin protocol header.
-In the handshake case, this is exactly the same data set, but also with a list of known peer nodes for the other end.
+I believe this is indicated as requited by the response expected flag in the Levin protocol header.
+In the handshake case, this is exactly the same data set for response as for request, 
+but also with a list of known peer nodes for the other end.
 So structure:
 
 Root Section
@@ -339,7 +343,7 @@ Root Section
     * top_id: uint8 "string", 32 bytes (in above dump at least), seems to be hex-encoded string value of top block in the chain.
 * peer_list: uint8 "string", custom formatted list of peer node information
 
-So the other information is not so interesting, as it was covered already for handshake parsing. 
+node_data and payload_data were covered already for handshake request parsing. 
 But the peer_list is new and has a custom format embeded in the binary string.
 In general, it seems the "string" datatype just refers to binary format "strings", so just byte arrays basically.
 The peer_list parses as a set of peer information structures, each one containing:
@@ -349,8 +353,8 @@ The peer_list parses as a set of peer information structures, each one containin
 * peer id type: 8 bytes uint64 value, little-endian
 * last seen: 8 bytes uint64 value, little-endian unix epoch timestamp
 
-This simply a form of a byte array dumped directly from memory.
-So to parse this, first count the size of a single data structure.
+This is simply a form of a byte array dumped directly from memory.
+To parse this, first count the size of a single data structure.
 This is 4+4+8+8 = 24 bytes.
 In this case, the data from the response packet dump has 2496 bytes in the peer_list byte string.
 Divided by 24 this becomes 104 peer list entries.
@@ -384,13 +388,14 @@ in the list I got. Still, it seems quite valid, but not copying it here anyways.
 The list actually also contains lots of 0.0.0.0 entries towards the end. 
 So it might be that the list is always of this specified length, even if at some point there are not that many peers
 connected to a particular node.
-Certainly, how all the peer id's are constructed, how peers are selected, and so on would be interesting to see.
+How all the peer id's are constructed, how peers are selected, and so on would be interesting to see,
+but did not have resources to go there.
 
 
 ### 1002: Timed Sync
 
 Timed sync seems to be a way for nodes to exchange synchronization information after a handshake.
-Again, no idea really, just guessing, would need a lot more reading of the CN code to really say.
+Again, no idea really, just guessing, would need a lot more reading of the CN code and proto implementation to really say.
 But the structure is very similar to that of the handshake:
 
 Root section
@@ -417,6 +422,7 @@ part with possibly added information. In fact, CN code defines the response stru
 
 So my guess is, this is just a similar way to synch the peer list, with same data structure as handshake,
 just missing information on the node itself. 
+There is also the local_time timestamp, for synchronizing clocks I guess.
 Likely the information on node itself is assumed to stay static after handshake, which makes sense.
 The blockchain moves, the peerlist has connections added and lost.
 Nodes own address, port, etc. stays.
@@ -451,13 +457,15 @@ The response packet I did not capture and parse but from the CN code, we can see
         }
     };
 
-So, the request is empty bodied (just root Section), while the response has two values. Something like this:
+So, the request is empty bodied (just root Section), while the response has two values. 
+
+Response would be something like this:
 
 Root section
 * status: uint8 "string", 2 bytes (for "OK)
 * peer_id: uint64, 8 bytes
 
-Note that response structure is a guess right now, did not go looking for separate capture on it, I just analyzed the request part.
+Note that response structure is a guess right now, I did not go looking for separate capture on it, I just analyzed the request part.
 But should be relatively straightforward to capture it and test.
 
 ## CN or 2000+X commands
@@ -472,16 +480,18 @@ This seems to be a message to synchronize new transactions between nodes.
 The structure seems to be a bit of a mess, but I guess it works:
 
 Root section
-* txs: array of uint8 "string" types, in practice just one value in the array (of uint8 type, code 10 from type list) 
+* txs: array of uint8 "string" types, in practice (for my packet dump at least) just one value in the array (of uint8 type, code 10 from type list) 
     * uint8 "string", 780 bytes in the packet dump I used, might vary in general. custom formatted transaction list.
 
 There is a single array element under the root section. This is created using the 0x80 array mask, with
 the masked type as BIN_KV_SERIALIZE_TYPE_STRING uint8 (= 10).
 It seems like someone had the right idea of putting in an array of transaction objects.
-However, it seems all the CN (2000+X) commands are using the "P2P" style general headers for the body,
+However, there was only one value in my packet dump in the array, so not sure if in other cases there are more.
+It seems all the CN (2000+X) commands are using the "P2P" style general headers for the body,
 but then dumping any specific data into a byte array represented by the BIN_KV_SERIALIZE_TYPE_STRING type.
-The contents of the "txs" array are actually a single element, containing the actual array content custom packed.
-This is similar to *peer_list* in the *1001 Handshake reply* message.
+As I noted, the contents of the "txs" array in this packet dump are actually a single element, 
+containing the actual array content custom packed.
+This is similar approach to *peer_list* in the *1001 Handshake reply* message.
 
 I would expect this is how all the 2000+X are formatted then.
 Also, this is where the "CN" style varints are now used. 
@@ -533,9 +543,9 @@ I ran tcpdump on this.
 Might be because the node was synchronizing, it was re-resending this as new transaction until the other node synchs up to it?
 Seems a bit of a waste, but if it works I guess?
 The CN code also maintains a status flag telling whether it has finished synchronizing or not, and discards these
-messages if it is state such as synchronizing still.
+messages if it is in a state such as synchronizing still.
 I actually removed this check for the duration of tracing how transactions are serialized,
-which might be useful.
+which might be useful in debugging/tracing the serialization.
 This was in CryptoNoteProtocolHandler::handle_notify_new_transactions, the check for 
 
     if (context.m_state != CryptoNoteConnectionContext::state_normal) {
@@ -557,6 +567,7 @@ Chunking this into 32 byte parts, and using each as a hex-encoded byte array to 
 to produce quite reasonable results.
 Towards the end, the packet I had, had a number of zeroed id's, which also seemed to match the other
 types of message with similar arrays (e.g., peer_list).
+Meaning, maybe it always sends a chunk of 100 blocks, whether it has that many or not.
 However, it does not quite match as the last non-zero one has a few bytes of non-zero and rest are zero.
 Also, taking the generated hashes, I could not find them on the block-explorer. So maybe not quite right.
 
@@ -608,7 +619,7 @@ Somewhere inside the code, declare a globally accessible flag variable. I put th
     {
         extern int leturt;
 
-And matching setting in CryptoNoteProtocolHandler.cpp:
+Not sure if that is necessary, but it didn't seem to hurt. Matching setting in CryptoNoteProtocolHandler.cpp:
 
     namespace CryptoNote
     {
@@ -627,8 +638,8 @@ And more specifically, adding more information on the context, such as:
 
 Most of the serialization related stuff seems to happen inside the code in the *Serialization* directory.
 So I found a good place to instrument code was to instrument all of the XXInputStreamSerializer and XXOutputStreamSerializer code, 
-meaning print out every call into any method there, with information of interest.
-Similarly, SerializationTools.h, SerializationOverrides.h, and ISerializer.h seemd like good places to trace.
+meaning print out every call into any method there, with information of intereste.
+Similarly, SerializationTools.h, SerializationOverrides.h, and ISerializer.h seemed like good places to trace.
 
 However, since there is lots and lots of serialization happening, and I was generally interested only in trying to
 reverse a single command/message at a time, the logs from this type of trace quickly grow huge, and it is difficult
@@ -643,7 +654,7 @@ First set if to zero globally:
 Now find places to set it to true in.
 
 *CryptoNoteProtocolHandler::handleCommand* in CryptoNoteProtocolHandler.cpp 
-sets up all the 2000+X command handlers, so one good place to start.
+sets up all the 2000+X command handlers, so this is one good place to start.
 Just above this is the definition of *notifyAdaptor()*, which is where the commands seem to pass through.
 So in this we can do some tricks such as:
 
@@ -683,7 +694,7 @@ Start the trace on call, end when done:
 Sometimes, when it gets really frustrating to figure out, I would also just set the flag globally and
 do searches for specific prints in the log file. But it gets yuuuuge fast.
 
-There are also places in the code that seem to do nothing, yet it seems like the CN developers tried their
+There are also places in the code that seem to do nothing, but no. It seems like the CN developers tried their
 best to obfuscate what it does. Operator overloading is all over the place in the Serialization code.
 And things like this:
 
